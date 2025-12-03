@@ -1,0 +1,1151 @@
+---
+title: "¨"
+title-slide-attributes: 
+  data-background-image: 2_paneris-winter-school.png
+  background-size: cover
+include-in-header:
+  text: |
+      <style>
+      #title-slide .title {
+        font-size: 0.1em;
+        color: #ffffff;
+      }
+      </style>
+format: 
+  revealjs:
+    slide-number: true
+    footer: "Attractors part 1 | Albert Compte"
+    self-contained: false
+execute:
+  eval: true
+---
+
+## Contents
+
+* cortical networks:
+  * EI networks: [Wilson and Cowan, 1972](https://doi.org/10.1016/S0006-3495(72)86068-5)
+  * Inhibition-stabilized networks: [Tsodyks et al, 1997](https://doi.org/10.1523/JNEUROSCI.17-11-04382.1997 ); [Ozeki et al, 2009](https://doi.org/10.1016/j.neuron.2009.03.028)
+* discrete attractor networks: [Amit and Brunel, 1997](https://doi.org/10.1093/cercor/7.3.237); [Wang, 2002](https://doi.org/10.1016/s0896-6273(02)01092-9); [Wong and Wang, 2006](https://doi.org/10.1523/jneurosci.3733-05.2006); [Roxin and Ledberg, 2008](https://doi.org/10.1371/journal.pcbi.1000046)
+* ring attractor networks: [Wilson and Cowan, 1973](https://doi.org/10.1007/bf00288786); [Amari, 1977](https://doi.org/10.1007/BF00337259); [Hansel and Sompolinsky, 1998](https://neurophysics.ucsd.edu/courses/physics_171/hansel_sompolinsky_bookchapter_1998.pdf)
+* low-rank RNNs: [Mastrogiuseppe and Ostojic, 2018](https://doi.org/10.1016/j.neuron.2018.07.003)
+
+  
+## Neural basis of cognition
+
+:::: {.columns}
+
+::: {.column}
+Working memory
+
+![](figs/miyashita_task.png){height="400" .fragment .fade-out fragment-index=1}
+
+![](figs/miyashita.png){.absolute top="160" left="40" height="400" .fragment fragment-index=1}
+
+[Sakai and Miyashita, 1991](https://doi.org/10.1038/354152a0)
+:::
+
+::: {.column .fragment fragment-index=2}
+Decision making
+
+![](figs/shadlen_newsome.jpeg){height="400" .fragment .fade-out fragment-index=3}
+
+
+![](figs/shadlen2001.png){.absolute top="160" right="100" height="400" .fragment fragment-index=3}
+
+[Shadlen and Newsome, 2001](https://doi.org/10.1152/jn.2001.86.4.1916)
+
+:::
+
+
+::::
+
+## The basic unit: the neuron
+
+:::: {.columns}
+
+::: {.column}
+![](figs/single_cell_recording.png){height="250"}
+:::
+
+::: {.column}
+![](figs/singe_cell_sim.svg)
+
+$$
+\tau \frac{d r(t)}{dt} = -r(t) + I(t)
+$$
+:::
+
+::::
+
+Euler method:
+
+$$
+\small \tau \frac{r(t+dt) - r(t)}{dt} = -r(t) + I(t) \; \; \; \Rightarrow \; \; \;
+r(t+dt) = r(t) + \frac{dt}{\tau} \left[ -r(t) + I(t) \right]
+$$
+  
+## Recurrent excitation in cortex
+
+:::: {.columns}
+
+::: {.column}
+![](figs/autapse.svg)
+
+$$
+\tau \frac{dr}{dt} = -r + J r
+$$
+:::
+
+::: {.column}
+
+```{python}
+import plotly.io as pio
+pio.renderers.default = "plotly_mimetype+notebook_connected"
+```
+
+``` {python}
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import numpy as np
+import matplotlib.pyplot as plt
+
+dt = 0.001 # time step, in s
+T = 5 # total time, in s
+time = np.arange(0, T, dt) # step times of the whole simulation, in s
+Nt = len(time) # total number of steps in simulation
+
+tau = 0.02
+alpha = 0.99
+
+def get_traces(alpha):
+    # initialize inputs 
+    input = np.ones((Nt,))
+    pulsesat = int(Nt/6)
+    input[pulsesat] = 3
+    input = input*np.abs(1-alpha)
+    
+    rate = np.ones((Nt,))
+
+    for i in range(Nt-1):
+        rate[i+1] = rate[i] + dt/tau*((alpha - 1)*rate[i] + input[i])
+
+    return rate, input
+
+
+# Create figure
+#fig = go.Figure()
+fig = make_subplots(rows=2, cols=1, row_heights=[0.3, 0.7])
+
+# Add traces, one for each slider step
+for step in np.arange(0.8, 1.1, 0.005):
+    rate, input = get_traces(step)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#FF0000", width=4),
+            name="",
+            x = time,
+            y = rate,
+            showlegend = False),
+            row = 2, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#000000", width=4),
+            name="",
+            x = time,
+            y = input,
+            showlegend = False),
+            row = 1, col = 1)
+
+# Make 1st trace visible
+loc = 0
+fig.data[loc].visible = True
+fig.data[loc+1].visible = True
+
+# Create and add slider
+steps = []
+for i in range(len(fig.data)//2):
+    step = dict(
+        method="update",
+        args=[{"visible": [False] * len(fig.data)}], 
+        label=str(np.around(0.005 * i + 0.8,3)) # layout attribute
+    )
+    step["args"][0]["visible"][2*i] = True  # Toggle i'th trace to "visible"
+    step["args"][0]["visible"][2*i+1] = True  # Toggle i'th trace to "visible"
+    steps.append(step)
+
+sliders = [dict(
+    active=loc,
+    currentvalue={"prefix": "Coupling J: "},
+    pad={"t": 10},
+    steps=steps
+)]
+
+fig.update_layout(
+    sliders=sliders, height=400, width=500,
+    margin=dict(l=20, r=20, t=20, b=20)
+)
+
+fig.update_xaxes(title_text="", range=[0, T], row=1, col=1)
+fig.update_xaxes(title_text="time (s)", range=[0, T], row=2, col=1)
+fig.update_yaxes(title_text="current",  row=1, col=1)
+fig.update_yaxes(title_text="rate",  row=2, col=1)
+
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+
+```
+
+:::
+
+::::
+
+## E-I network
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](figs/EInetwork.svg){width="100%"}
+
+\begin{eqnarray*}
+
+\newcommand{\blue}[1]{\color{blue}{#1}}
+\newcommand{\red}[1]{\color{red}{#1}}
+
+\small \tau_E \frac{d r_E(t)}{dt} &=& \small -r_E(t) + G_E \left[ \red{W_{EE}} r_E(t) - \blue{W_{EI}} r_I(t) + I_E(t) - \theta_E \right]_{+} \\
+
+\small \tau_I \frac{d r_I(t)}{dt} &=& \small -r_I(t) + G_I \left[ \red{W_{IE}} r_E(t) - \blue{W_{II}} r_I(t) + I_I(t) - \theta_I \right]_{+} 
+
+\end{eqnarray*}
+:::
+
+::: {.column width="50%" .fragment}
+
+``` {python}
+dt = 0.001 # time step, in s
+T = 3 # total time, in s
+time = np.arange(0, T, dt) # step times of the whole simulation, in s
+Nt = len(time) # total number of steps in simulation
+
+input = np.zeros((Nt,))
+pulsesat = int(Nt/3)
+input[pulsesat:pulsesat+250] = 5.5
+
+# equations and parameters from https://doi.org/10.7554/eLife.22425
+tauE = 0.15
+tauI = 0.01
+WEE = 5
+WEI = 1
+WIE = 10
+WII = 0.5
+GE = 1
+GI = 4
+
+def rectify(x, threshold):
+    return (x - threshold) * (x > threshold)
+
+def get_traces(WEE):
+    
+    rateI = np.zeros((Nt,))
+    rateE = np.zeros((Nt,))
+
+    for i in range(Nt-1):
+        rateE[i+1] = rateE[i] + dt/tauE*( -rateE[i] + GE * rectify(WEE*rateE[i] - WEI*rateI[i] + input[i], 3) )
+        rateI[i+1] = rateI[i] + dt/tauI*( -rateI[i] + GI * rectify(WIE*rateE[i] - WII*rateI[i] + input[i], 25) )
+
+    return rateE, rateI, input
+
+
+# Create figure
+#fig = go.Figure()
+fig = make_subplots(rows=2, cols=1, row_heights=[0.3, 0.7], shared_xaxes=True)
+
+# Add traces, one for each slider step
+for step in np.arange(4, 6, 0.01):
+    rateE, rateI, input = get_traces(step)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#FF0000", width=4),
+            name="E-pop",
+            x = time,
+            y = rateE,
+            showlegend = False),
+            row = 2, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#0000FF", width=4),
+            name="I-pop",
+            x = time,
+            y = rateI,
+            showlegend = False),
+            row = 2, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#000000", width=4),
+            name="",
+            x = time,
+            y = input,
+            showlegend = False),
+            row = 1, col = 1)
+
+# Make 10th trace visible
+mid = len(fig.data)//3
+fig.data[mid].visible = True
+fig.data[mid+1].visible = True
+fig.data[mid+2].visible = True
+
+# Create and add slider
+steps = []
+for i in range(len(fig.data)//3):
+    step = dict(
+        method="update",
+        args=[{"visible": [False] * len(fig.data)}], 
+        label=str(np.around(0.01 * i + 4, 2)) # layout attribute
+    )
+    step["args"][0]["visible"][3*i] = True  # Toggle i'th trace to "visible"
+    step["args"][0]["visible"][3*i+1] = True  # Toggle i'th trace to "visible"
+    step["args"][0]["visible"][3*i+2] = True  # Toggle i'th trace to "visible"
+    steps.append(step)
+
+sliders = [dict(
+    active=mid/2,
+    currentvalue={"prefix": "Coupling WEE: "},
+    pad={"t": 10},
+    steps=steps
+)]
+
+fig.update_layout(
+    sliders=sliders, height=400, width=500,
+    margin=dict(l=20, r=20, t=20, b=20)
+)
+
+fig.update_xaxes(title_text="", range=[0, T], row=1, col=1)
+fig.update_xaxes(title_text="time (s)", range=[0, T], row=2, col=1)
+fig.update_yaxes(title_text="current",  row=1, col=1)
+fig.update_yaxes(title_text="rate",  row=2, col=1)
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+```
+
+:::
+
+::::
+
+::: {.absolute bottom="-20" right="50"}
+[Wilson and Cowan, 1972](https://doi.org/10.1016/S0006-3495(72)86068-5)
+:::
+
+## Phase-space analysis 
+
+:::: {.columns}
+
+::: {.column}
+
+``` {python}
+import brainpy as bp
+import brainpy.math as bm
+
+bm.enable_x64()
+bm.set_platform('cpu')
+
+@bp.odeint
+def int_E(rE, t, rI, input=0.1, WEE=WEE, thrE=3, tauE=tauE, GE=GE):
+    return - rE / tauE + GE * rectify(WEE*rE - WEI*rI + input, thrE) / tauE
+
+@bp.odeint
+def int_I(rI, t, rE, input=0.1, WIE=WIE, thrI=25, tauI=tauI, GI=GI):
+    return - rI / tauI + GI * rectify(WIE*rE - WII*rI + input, thrI)  / tauI
+
+
+analyzer = bp.analysis.PhasePlane2D(
+    model=[int_E, int_I],
+    target_vars={'rE': [0, 5], 'rI': [0, 20]},
+    pars_update={'thrE': 1},
+    # pars_update={'input': 0, 'WEE': 5, 'thrE': 3, 'tauE': 0.25, 'tauI': 0.01, 'GI': 4, 'thrI': 25},
+    resolutions=0.05,
+)
+analyzer.plot_vector_field()
+analyzer.plot_nullcline(coords=dict(rI='rE-rI'),
+                        x_style={'fmt': '-'},
+                        y_style={'fmt': '-'})
+analyzer.plot_fixed_point()
+
+plt.gca().set_box_aspect(1)
+plt.ylabel('$rate_I$')
+plt.xlabel('$rate_E$')
+plt.tight_layout()
+
+```
+:::
+
+::: {.column}
+
+::: {.fragment}
+
+``` {python}
+
+analyzer = bp.analysis.Bifurcation2D(
+  model=[int_E, int_I],
+  target_vars={'rE': [0., 10], 'rI': [0., 20.]},
+#  target_pars={'thrE': [2., 15.]},
+#  resolutions={'thrE': 0.3},
+  target_pars={'WEE': [2., 6.]},
+  resolutions={'WEE': 0.05},
+)
+
+analyzer.plot_bifurcation(num_rank=50)
+
+plt.close();
+plt.gca().set_box_aspect(1)
+plt.xlabel('WEE')
+plt.ylabel('$rate_E$')
+plt.tight_layout()
+
+```
+
+:::
+
+:::
+
+::::
+
+::: {style="text-align: right"}
+Brainpy: [Wang et al 2023](https://doi.org/10.7554/eLife.86365)
+:::
+
+## Discrete working memory
+
+:::: {.columns}
+
+::: {.column}
+
+![](figs/miyashita.png){fig-align="center" height="400"}
+
+[Sakai and Miyashita, 1991](https://doi.org/10.1038/354152a0)
+:::
+
+::: {.column}
+
+![](figs/inagaki.png){fig-align="center" height="400"}
+
+::: {style="text-align: right"}
+[Inagaki et al, 2019](https://doi.org/10.1038/s41586-019-0919-7)
+:::
+
+:::
+
+::::
+
+## The double-well model
+
+![](figs/doublewell1.svg){fig-align="center" width="70%"}
+
+
+\begin{eqnarray*}
+
+\newcommand{\blue}[1]{\color{blue}{#1}}
+\newcommand{\red}[1]{\color{red}{#1}}
+
+\small \tau_E \frac{d I_{E1}(t)}{dt} &=& \small -I_{E1}(t) + \red{W_{EE}} g_E(I_{E1}(t)) - \blue{W_{EI}} g_I(I_I(t)) + S_1(t) \\
+
+\small \tau_E \frac{d I_{E2}(t)}{dt} &=& \small -I_{E2}(t) + \red{W_{EE}} g_E(I_{E2}(t)) - \blue{W_{EI}} g_I(I_I(t)) + S_2(t) \\
+
+\small \tau_I \frac{d I_I(t)}{dt} &=& \small -I_I(t) + \red{W_{IE}} g_E(I_{E1}(t)) + \red{W_{IE}} g_E(I_{E2}(t)) - \blue{W_{II}} I_I(t) 
+
+\end{eqnarray*}
+
+## The double-well model
+
+![](figs/doublewell3.svg){fig-align="center" width="70%"}
+
+\begin{eqnarray*}
+
+\newcommand{\blue}[1]{\color{blue}{#1}}
+\newcommand{\red}[1]{\color{red}{#1}}
+
+\small \tau_E \frac{d I_{E1}}{dt} &=& \small - I_{E1} + \red{(W_{EE} - \alpha)} g_E(I_{E1}) - \blue{\alpha} g_E(I_{E2}) + S_{1} \\
+
+\small \tau_E \frac{d I_{E2}}{dt} &=& \small - I_{E2} + \red{(W_{EE} - \alpha)} g_E(I_{E2}) - \blue{\alpha} g_E(I_{E1}) + S_{2} \\
+
+\small \alpha &=& \small -\gamma W_{EI} W_{IE}
+
+\end{eqnarray*}
+
+
+## The double-well model
+
+![](figs/doublewell3.svg){fig-align="center" width="60%"}
+
+\begin{eqnarray*}
+
+\newcommand{\blue}[1]{\color{blue}{#1}}
+\newcommand{\red}[1]{\color{red}{#1}}
+
+\small \tau_E \frac{d I_{E1}}{dt} &=& \small - I_{E1} + \color{red}{J_E} g_E(I_{E1}) - \blue{J_I} g_E(I_{E2}) + S_{1} \\
+
+\small \tau_E \frac{d I_{E2}}{dt} &=& \small - I_{E2} + \red{J_E} g_E(I_{E2}) - \blue{J_I} g_E(I_{E1}) + S_{2} 
+
+\end{eqnarray*}
+
+::: {style="text-align: right"}
+[Wong and Wang 2006](https://doi.org/10.1523/JNEUROSCI.3733-05.2006)
+:::
+
+## Selective memory
+
+:::: {.columns}
+
+::: {.column}
+
+![](figs/doublewell3.svg){fig-align="center" width="550"}
+
+::: 
+
+::: {.column}
+
+``` {python}
+#| fig-align: center
+dt = 0.0002
+T=2
+time = np.arange(0, T, dt)
+Nt = len(time)
+
+tauE = 0.01
+JE = 1.1
+JI = 1.8
+drive = 0.05
+
+sigma = 0.2
+
+def curr_to_rate(x):
+    return (1+np.tanh(x-0.5))/2
+
+def get_traces(inp_to=0):
+    # initialize inputs 
+    inputE1 = drive*np.ones((Nt,))
+    inputE2 = drive*np.ones((Nt,))
+
+    pulsesat = int(Nt/3)
+    if inp_to==1:
+        inputE1[pulsesat:pulsesat+200] = 0.4
+    elif inp_to==-1:
+        inputE2[pulsesat:pulsesat+200] = 0.4
+
+    inpE1 = -0.005*np.ones((Nt,))
+    inpE2 = -0.005*np.ones((Nt,))
+
+    for i in range(Nt-1):
+        noise = sigma * np.random.randn()
+        inpE1[i+1] = inpE1[i] + dt/tauE*(-inpE1[i] + JE*curr_to_rate(inpE1[i]) - JI*curr_to_rate(inpE2[i]) + inputE1[i] + noise)
+        noise = sigma * np.random.randn()
+        inpE2[i+1] = inpE2[i] + dt/tauE*(-inpE2[i] + JE*curr_to_rate(inpE2[i]) - JI*curr_to_rate(inpE1[i]) + inputE2[i] + noise)
+
+    rateE1 = curr_to_rate(inpE1)
+    rateE2 = curr_to_rate(inpE2)
+
+    return rateE1, rateE2, inputE1, inputE2
+
+
+# Create figure
+#fig = go.Figure()
+fig = make_subplots(rows=2, cols=1, row_heights=[0.3, 0.7], shared_xaxes=True)
+
+for step in list([-1, 0, 1]):
+    rateE1, rateE2, inputE1, inputE2 = get_traces(step)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#FF0000", width=4),
+            name="Pop 1",
+            x = time,
+            y = rateE1,
+            showlegend = False),
+            row = 2, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#CC00CC", width=4),
+            name="Pop 2",
+            x = time,
+            y = rateE2,
+            showlegend = False),
+            row = 2, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#AA0000", width=4),
+            name="",
+            x = time,
+            y = inputE1,
+            showlegend = False),
+            row = 1, col = 1)
+    fig.add_trace(
+        go.Scatter(
+            visible=False,
+            line=dict(color="#AA00AA", width=4),
+            name="",
+            x = time,
+            y = inputE2,
+            showlegend = False),
+            row = 1, col = 1)
+
+# Make 10th trace visible
+mid = len(fig.data)//3
+fig.data[mid].visible = True
+fig.data[mid+1].visible = True
+fig.data[mid+2].visible = True
+fig.data[mid+3].visible = True
+
+
+fig.update_layout(
+    height=400, width=500,
+    margin=dict(l=20, r=20, t=20, b=20),
+    updatemenus=[
+        dict(
+            type="buttons",
+            direction="right",
+            active=0,
+            x=0.57,
+            y=1.2,
+            buttons=list([
+                dict(label="None",
+                     method="update",
+                     args=[{"visible": [False, False, False, False, True, True, True, True, False, False, False, False]},
+                           {"title": "No stim"}]),
+                dict(label="StimE1",
+                     method="update",
+                     args=[{"visible": [False, False, False, False, False, False, False, False, True, True, True, True]},
+                           {"title": "Stim E1"}]),
+                dict(label="StimE2",
+                     method="update",
+                     args=[{"visible": [True, True, True, True, False, False, False, False, False, False, False, False]},
+                           {"title": "Stim E2"}]),
+            ]),
+        )
+    ])
+
+fig.update_xaxes(title_text="", range=[0, T], row=1, col=1)
+fig.update_xaxes(title_text="time (s)", range=[0, T], row=2, col=1)
+fig.update_yaxes(title_text="current", range=[-0.1, 0.5], row=1, col=1)
+fig.update_yaxes(title_text="rate", range=[0, 1.], row=2, col=1)
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+
+```
+:::
+
+::::
+
+## Double-well: Phase-space analysis
+
+:::: {.columns}
+
+::: {.column}
+
+``` {python}
+
+@bp.odeint
+def int_r1(r1, t, r2, drive=drive):
+    fct = 2*r1*(1.-r1)/tauE
+    cnv = 0.5 + bm.atanh(2*r1 - 1.)
+    return (- cnv + JE*r1 - JI*r2 + drive) *fct
+
+@bp.odeint
+def int_r2(r2, t, r1, drive=drive):
+    fct = 2*r2*(1.-r2)/tauE
+    cnv = 0.5 + bm.atanh(2*r2 - 1.)
+    return (- cnv + JE*r2 - JI*r1 + drive) *fct
+
+
+analyzer = bp.analysis.PhasePlane2D(
+    model=[int_r1, int_r2],
+    target_vars={'r1': [0, 1], 'r2': [0, 1]},
+    # pars_update={'drive': -0.5},
+    resolutions=0.0005,
+)
+analyzer.plot_vector_field()
+analyzer.plot_nullcline(coords=dict(r2='r2-r1'),
+                        x_style={'fmt': '-'},
+                        y_style={'fmt': '-'})
+analyzer.plot_fixed_point()
+plt.gca().set_box_aspect(1)
+plt.tight_layout()
+
+```
+
+:::
+
+::: {.column}
+
+``` {python}
+
+@bp.odeint
+def int_s1(s1, t, s2, drive=drive):
+    crE1 = (1 + bm.tanh(s1 - 0.5))/2.
+    crE2 = (1 + bm.tanh(s2 - 0.5))/2.
+    return - s1 / tauE + JE*crE1 / tauE - JI*crE2 / tauE + drive / tauE
+
+@bp.odeint
+def int_s2(s2, t, s1, drive=drive):
+    crE1 = (1 + bm.tanh(s1 - 0.5))/2.
+    crE2 = (1 + bm.tanh(s2 - 0.5))/2.
+    return - s2 / tauE + JE*crE2 / tauE - JI*crE1 / tauE + drive / tauE
+
+# analyzer = bp.analysis.Bifurcation2D(
+#   model=[int_s1, int_s2],
+#   target_vars={'s1': [-3., 2.], 's2': [-3., 2.]},
+#   target_pars={'drive': [-0.8, 0.2]},
+#   resolutions={'drive': 0.01},
+# )
+
+
+analyzer = bp.analysis.Bifurcation2D(
+  model=[int_s1, int_s2],
+  target_vars={'s1': [-1.5, 1.5], 's2': [-1.5, 1.5]},
+  target_pars={'drive': [-0.2, 0.5]},
+  resolutions={'drive': 0.01},
+)
+
+analyzer.plot_bifurcation(num_rank=50)
+
+plt.close();
+plt.gca().set_box_aspect(1)
+plt.xlabel('drive')
+plt.ylabel('current E1 (s1)')
+plt.tight_layout()
+
+```
+
+:::
+
+::::
+
+## Drive modulates network function
+
+:::: {.columns}
+
+::: {.column}
+``` {python}
+dt = 0.0002
+T=2
+time = np.arange(0, T, dt)
+Nt = len(time)
+
+tauE = 0.01
+JE = 1.1
+JI = 1.8
+drive = 0.05
+
+sigma = 0.2
+
+def curr_to_rate(x):
+    return (1+np.tanh(x-0.5))/2
+
+# initialize inputs 
+step = 0.2
+inputE1 = (drive-step)*np.ones((Nt,))
+inputE2 = (drive-step)*np.ones((Nt,))
+inputE1[Nt//2:] += step
+inputE2[Nt//2:] += step
+
+pulsesat = int(Nt/4)
+inputE1[pulsesat:pulsesat+200] = 0.4
+
+pulsesat = int(3*Nt/4)
+inputE1[pulsesat:pulsesat+200] = 0.4
+
+inpE1 = -0.005*np.ones((Nt,))
+inpE2 = -0.005*np.ones((Nt,))
+
+for i in range(Nt-1):
+    noise = sigma * np.random.randn()
+    inpE1[i+1] = inpE1[i] + dt/tauE*(-inpE1[i] + JE*curr_to_rate(inpE1[i]) - JI*curr_to_rate(inpE2[i]) + inputE1[i] + noise)
+    noise = sigma * np.random.randn()
+    inpE2[i+1] = inpE2[i] + dt/tauE*(-inpE2[i] + JE*curr_to_rate(inpE2[i]) - JI*curr_to_rate(inpE1[i]) + inputE2[i] + noise)
+
+rateE1 = curr_to_rate(inpE1)
+rateE2 = curr_to_rate(inpE2)
+
+# Create figure
+#fig = go.Figure()
+fig = make_subplots(rows=2, cols=1, row_heights=[0.3, 0.7], shared_xaxes=True)
+
+fig.add_trace(
+    go.Scatter(
+        visible=True,
+        line=dict(color="#FF0000", width=4),
+        name="Pop 1",
+        x = time,
+        y = rateE1,
+        showlegend = False),
+        row = 2, col = 1)
+fig.add_trace(
+    go.Scatter(
+        visible=True,
+        line=dict(color="#CC00CC", width=4),
+        name="Pop 2",
+        x = time,
+        y = rateE2,
+        showlegend = False),
+        row = 2, col = 1)
+fig.add_trace(
+    go.Scatter(
+        visible=True,
+        line=dict(color="#AA0000", width=4),
+        name="",
+        x = time,
+        y = inputE1,
+        showlegend = False),
+        row = 1, col = 1)
+fig.add_trace(
+    go.Scatter(
+        visible=True,
+        line=dict(color="#AA00AA", width=4),
+        name="",
+        x = time,
+        y = inputE2,
+        showlegend = False),
+        row = 1, col = 1)
+
+fig.update_layout(
+    height=400, width=500,
+    margin=dict(l=20, r=20, t=20, b=20))
+
+fig.update_xaxes(title_text="", range=[0, T], row=1, col=1)
+fig.update_xaxes(title_text="time (s)", range=[0, T], row=2, col=1)
+fig.update_yaxes(title_text="current", range=[-step-0.05, 0.5], row=1, col=1)
+fig.update_yaxes(title_text="rate", range=[0, 0.8], row=2, col=1)
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+
+```
+:::
+
+::: {.column}
+``` {python}
+JE = 1.1
+JI = 1.8
+drive = 0.05
+
+@bp.odeint
+def int_s1(s1, t, s2, drive=drive):
+    crE1 = (1 + bm.tanh(s1 - 0.5))/2.
+    crE2 = (1 + bm.tanh(s2 - 0.5))/2.
+    return - s1 / tauE + JE*crE1 / tauE - JI*crE2 / tauE + drive / tauE
+
+@bp.odeint
+def int_s2(s2, t, s1, drive=drive):
+    crE1 = (1 + bm.tanh(s1 - 0.5))/2.
+    crE2 = (1 + bm.tanh(s2 - 0.5))/2.
+    return - s2 / tauE + JE*crE2 / tauE - JI*crE1 / tauE + drive / tauE
+
+analyzer = bp.analysis.Bifurcation2D(
+  model=[int_s1, int_s2],
+  target_vars={'s1': [-1.5, 1.5], 's2': [-1.5, 1.5]},
+  target_pars={'drive': [-0.2, 0.5]},
+  resolutions={'drive': 0.01},
+)
+
+analyzer.plot_bifurcation(num_rank=50)
+
+plt.close()
+plt.gca().set_box_aspect(1)
+plt.xlabel('drive')
+plt.ylabel('current E1 (s1)')
+plt.tight_layout();
+
+```
+:::
+
+::::
+
+
+## Double-well: Energy landscape
+
+
+$\scriptstyle E(r_1, r_2) = -\frac{J_E}{2} (r_1^2 + r_2^2) + J_I r_1 r_2 - S (r_1 + r_2) + \int_0^{r_1} g_E^{-1}(x) dx + \int_0^{r_2} g_E^{-1}(x) dx$
+
+::: {style="text-align: right"}
+[Gerstner et al, 2014](https://neuronaldynamics.epfl.ch/online/Ch16.S4.html)
+:::
+
+
+:::: {.columns}
+
+::: {.column}
+
+``` {python}
+#| fig-align: center
+
+# Valid color strings are CSS colors, rgb or hex strings
+# colorscale = [[0, 'gold'], [0.5, 'mediumturquoise'], [1, 'lightsalmon']]
+# colorscale = [ [0, 'lightsalmon'], [0.5, 'mediumturquoise'], [1, 'gold']]
+colorscale = "Viridis"
+
+np.seterr(divide = 'ignore') 
+
+def integral(rate):
+    lim = 2*rate - 1
+    return 0.5*rate + 0.5* (lim*np.arctanh(lim) + 0.5*np.log(np.abs(1-lim*lim)) -0.7);
+
+def get_energy(drive1, drive2):
+    energy = np.zeros((100,100))    
+    rate1 = np.linspace(0,1,100)
+    rate2 = np.linspace(0,1,100)
+    for i, r1 in enumerate(rate1):
+        for j, r2 in enumerate(rate2):
+            energy[i,j] = -0.5*JE*(r1**2 + r2**2) + JI*r1*r2 - (drive1*r1 + drive2*r2) + integral(r1) + integral(r2)
+
+    return energy, rate1, rate2
+
+energy, rate1, rate2 = get_energy(drive, drive)
+
+# create figure
+layout = go.Layout(hovermode=False)
+fig = go.Figure(layout=layout)
+
+# Add surface trace
+potential=energy
+potential[potential>0.25]=np.nan
+fig.add_trace(go.Surface(z=potential, 
+    x=rate1, 
+    y=rate2,
+    contours = {
+        "z": {"show": True, "start": -0.15, "end": 0.25, "size": 0.01, "color":"white"}
+    },
+    colorscale=colorscale,
+    colorbar_title_text='energy'))
+
+fig.update_traces(contours_z=dict(show=True, usecolormap=True,highlightcolor="limegreen", project_z=False))
+
+# Update plot sizing
+fig.update_layout(
+    width=500, height=450,
+    autosize=False,
+    margin=dict(t=0, b=0, l=0, r=0),
+    template="plotly_white",
+)
+
+# Update 3D scene options
+fig.update_scenes(
+    aspectratio=dict(x=1, y=1, z=0.7),
+    aspectmode="manual"
+)
+
+
+fig.update_scenes(xaxis_title_text='rate population 1',  
+                  yaxis_title_text='rate population 2',  
+                  zaxis_title_text='energy')
+
+```
+:::
+
+::: {.column .fragment}
+
+``` {python}
+def integral(rate):
+    lim = 2*rate - 1
+    return 0.5*rate + 0.5* (lim*np.arctanh(lim) + 0.5*np.log(np.abs(1-lim*lim)) -0.7);
+
+def get_energy(drive1, drive2):
+    energy = np.zeros((100,100))    
+    rate1 = np.linspace(0,1,100)
+    rate2 = np.linspace(0,1,100)
+    for i, r1 in enumerate(rate1):
+        for j, r2 in enumerate(rate2):
+            energy[i,j] = -0.5*JE*(r1**2 + r2**2) + JI*r1*r2 - (drive1*r1 + drive2*r2) + integral(r1) + integral(r2)
+
+    return energy, rate1, rate2
+
+layout = go.Layout(hovermode=False)
+fig = go.Figure(layout=layout)
+      
+energy, rateE1, rateE2 = get_energy(drive, drive)
+# energy[energy>-0.15]=np.nan
+fig.add_trace(
+        go.Contour(
+            visible=True,
+            x = rateE1,
+            y = rateE2,
+            z = energy,
+            contours = {"start": -0.3025, "end": -0.276, "size": 0.002, "coloring":"lines"},
+            colorscale=colorscale,
+            colorbar_title_text='energy'
+            )
+        )
+
+fig.update_layout(height=450, width=500,
+    autosize=False,
+    margin=dict(t=0, b=0, l=0, r=0),
+    template="plotly_white",
+)
+
+
+fig.update_xaxes(title_text="rate 1", range=[0, 1])
+fig.update_yaxes(title_text="rate 2", range=[0, 1])
+fig.update_scenes(xaxis_title_text='rate 1',  
+                  yaxis_title_text='rate 2')
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+
+```
+
+:::
+
+::::
+
+
+## Double-well: Energy landscape
+
+
+$\scriptstyle E(r_1, r_2) = -\frac{J_E}{2} (r_1^2 + r_2^2) + J_I r_1 r_2 - S (r_1 + r_2) + \int_0^{r_1} g_E^{-1}(x) dx + \int_0^{r_2} g_E^{-1}(x) dx$
+
+::: {style="text-align: right"}
+[Gerstner et al, 2014](https://neuronaldynamics.epfl.ch/online/Ch16.S4.html)
+:::
+
+
+:::: {.columns}
+
+::: {.column}
+``` {python}
+import seaborn as sns
+
+# slck = 0.05
+
+# r1 = np.linspace(slck,0.5-slck,100)
+# r2 = -r1+0.5
+
+# i1 = r1*100
+# i1 = i1.astype(int)
+# i2 = r2*100
+# i2 = i2.astype(int)
+
+slck = 4
+i1 = np.arange(slck,50-slck)
+i2 = slck + np.nanargmin(energy[slck:50-slck, slck:50-slck], axis=1)
+r1 = rateE1[i1]
+r2 = rateE2[i2]
+
+# slck = 4
+# i2 = np.arange(slck,25)
+# i1 = slck + np.nanargmin(energy[slck:25, slck:25], axis=0)
+
+# i1b = np.arange(25,50-slck)
+# i2b = 25 + np.nanargmin(energy[25:50-slck, 25:50-slck], axis=1)
+# i1 = np.concatenate([i1, i1b])
+# i2 = np.concatenate([i2, i2b])
+# r1 = rateE1[i1]
+# r2 = rateE2[i2]
+
+plt.plot(r1, energy[i1, i2], 'r-', lw=4);
+plt.xlabel('rate 1')
+plt.ylabel('energy');
+plt.ylim([-0.303, -0.301])
+plt.gca().set_aspect('auto')
+sns.despine()
+```
+:::
+
+::: {.column}
+
+``` {python}
+def integral(rate):
+    lim = 2*rate - 1
+    return 0.5*rate + 0.5* (lim*np.arctanh(lim) + 0.5*np.log(np.abs(1-lim*lim)) -0.7);
+
+def get_energy(drive1, drive2):
+    energy = np.zeros((100,100))    
+    rate1 = np.linspace(0,1,100)
+    rate2 = np.linspace(0,1,100)
+    for i, r1 in enumerate(rate1):
+        for j, r2 in enumerate(rate2):
+            energy[i,j] = -0.5*JE*(r1**2 + r2**2) + JI*r1*r2 - (drive1*r1 + drive2*r2) + integral(r1) + integral(r2)
+
+    return energy, rate1, rate2
+
+layout = go.Layout(hovermode=False)
+fig = go.Figure(layout=layout)
+      
+energy, rateE1, rateE2 = get_energy(drive, drive)
+# energy[energy>-0.15]=np.nan
+fig.add_trace(
+        go.Contour(
+            visible=True,
+            x = rateE1,
+            y = rateE2,
+            z = energy,
+            contours = {"start": -0.3025, "end": -0.276, "size": 0.002, "coloring":"lines"},
+            colorscale=colorscale,
+            colorbar_title_text='energy'
+            )
+        )
+
+fig.add_trace(go.Scatter(x=r1, y=r2,
+                    mode='lines',
+                    name='lines',
+                    marker_color='red'))
+
+fig.update_layout(height=450, width=500,
+    autosize=False,
+    margin=dict(t=0, b=0, l=0, r=0),
+    template="plotly_white",
+)
+
+
+fig.update_xaxes(title_text="rate 1", range=[0, 1])
+fig.update_yaxes(title_text="rate 2", range=[0, 1])
+fig.update_scenes(xaxis_title_text='rate 1',  
+                  yaxis_title_text='rate 2')
+
+config = {'displayModeBar': False}
+
+fig.show(config=config)
+
+```
+
+:::
+
+::::
+
+
+## Experimental evidence
+
+:::: {.columns}
+
+::: {.column}
+![](figs/Ona_Fig%201_task_schematic.svg){fig-align="center" width="500" .fragment .fade-out fragment-index=1}
+
+![](figs/ona-jodar_beh.png){.absolute top="100" left="30" width="500" .fragment fragment-index=1}
+
+:::
+
+::: {.column}
+![](figs/Ona_Final%20figure_6.png){fig-align="center" width="500"}
+
+:::
+
+::::
+
+::: {style="text-align: right"}
+[(Ona-Jodar et al. bioRxiv 2025)](https://doi.org/10.1101/2024.02.18.579447)
+:::
+
+# End of part 1!
+
+
+
