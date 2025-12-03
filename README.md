@@ -1,4 +1,4 @@
-# Wokshop on attractor networks for simple cognitive tasks
+<img src="2_paneris-winter-school.png" width="800">
 
 In this repository you can find printouts of the presentations of the class (`\*.pdf`), together with their souce code in [Quarto](https://quarto.org) (`\*.qmd`).
 
