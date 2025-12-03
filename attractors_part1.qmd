@@ -20,6 +20,12 @@ execute:
   eval: true
 ---
 
+## Materials
+
+Materials for the class: [github.com/acompte/attractors](https://github.com/acompte/attractors). 
+
+Click [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/acompte/attractors/main?urlpath=%2Fdoc%2Ftree%2Fattractors_part1_notebook.ipynb) to open exercises
+  
 ## Contents
 
 * cortical networks:
@@ -29,7 +35,6 @@ execute:
 * ring attractor networks: [Wilson and Cowan, 1973](https://doi.org/10.1007/bf00288786); [Amari, 1977](https://doi.org/10.1007/BF00337259); [Hansel and Sompolinsky, 1998](https://neurophysics.ucsd.edu/courses/physics_171/hansel_sompolinsky_bookchapter_1998.pdf)
 * low-rank RNNs: [Mastrogiuseppe and Ostojic, 2018](https://doi.org/10.1016/j.neuron.2018.07.003)
 
-  
 ## Neural basis of cognition
 
 :::: {.columns}
