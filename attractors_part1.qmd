@@ -24,7 +24,7 @@ execute:
 
 Materials for the class: [github.com/acompte/attractors](https://github.com/acompte/attractors). 
 
-Click [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/acompte/attractors/main?urlpath=%2Fdoc%2Ftree%2Fattractors_part1_notebook.ipynb) to open exercises
+Ctrl-click [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/acompte/attractors/main?urlpath=%2Fdoc%2Ftree%2Fattractors_part1_notebook.ipynb) to open exercises
   
 ## Contents
 
